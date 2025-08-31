@@ -1,0 +1,103 @@
+# Importere nødvendige biblioteker for datahåndtering og maskinlæring
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_iris  # For å laste inn iris-datasettet
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score  # For datadeling og hyperparameter-tuning
+from sklearn.neighbors import KNeighborsClassifier  # KNN-modellen
+from sklearn.tree import DecisionTreeClassifier  # Beslutningstre-modellen
+from sklearn.ensemble import RandomForestClassifier  # Random Forest-modellen
+from sklearn.metrics import confusion_matrix, classification_report  # For å evaluere modellen
+from sklearn.preprocessing import StandardScaler  # For å skalere dataene
+
+# Trinn 1: Last ned iris-datasettet
+iris = load_iris()  # Laste inn iris-datasettet
+# Lag en DataFrame fra datasettet med egenskaper og mål
+iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+iris_df['species'] = iris.target  # Legger til målvariabelen (arten av blomsten)
+
+# Vis de første radene i datasettet for å forstå strukturen
+print("Første radene i datasettet:")
+print(iris_df.head())
+
+# Trinn 2: Visualisere dataene for å se forholdet mellom egenskapene
+sns.pairplot(iris_df, hue='species')  # Lager et parplot for visuell inspeksjon av dataene
+plt.title("Iris Dataset Pairplot")  # Legger til tittel til plottet
+plt.show()  # Viser plottet
+
+# Trinn 3: Dataforbehandling
+# Standardisere dataene for å forbedre ytelsen til modellene
+scaler = StandardScaler()  # Initialiserer skaleringsverktøyet
+# Skalerer kun egenskapene (ikke målvariabelen)
+iris_scaled = scaler.fit_transform(iris_df.iloc[:, :-1])
+
+# Del datasettet i trening og test-sett (80% trening, 20% testing)
+X_train, X_test, y_train, y_test = train_test_split(iris_scaled, iris_df['species'], test_size=0.2, random_state=42)
+
+# Trinn 4: Sammenligne flere maskinlæringsmodeller
+# Definerer en ordbok for å lagre modellene som skal sammenlignes
+models = {
+    'KNN': KNeighborsClassifier(),  # KNN-modell
+    'Decision Tree': DecisionTreeClassifier(),  # Beslutningstre-modell
+    'Random Forest': RandomForestClassifier()  # Random Forest-modell
+}
+
+# En ordbok for å lagre kryssvalideringsresultater
+results = {}
+
+# Loop gjennom hver modell
+for model_name, model in models.items():
+    # Kryssvalidering for å evaluere modellen med 5 fold
+    scores = cross_val_score(model, X_train, y_train, cv=5)
+    results[model_name] = scores  # Lagre score-resultatene
+
+    # Trene modellen på treningsdataene
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)  # Predikere på testdataene
+    
+    # Evaluere modellen
+    print(f"\n{model_name} Resultater:")
+    print("Forvirringsmatrise:")
+    print(confusion_matrix(y_test, predictions))  # Vise forvirringsmatrise
+    print("\nKlassifikasjonsrapport:")
+    print(classification_report(y_test, predictions))  # Vise klassifikasjonsrapport
+
+    # Visualisere kryssvalideringsresultatene med et boxplot
+    plt.figure(figsize=(10, 6))
+    plt.subplot(211)  # Opprett en subplot for boxplot
+    plt.boxplot(scores, labels=[model_name])  # Plotte scores
+    plt.title(f'{model_name} Kryssvalideringsresultater')  # Tittel til plot
+    plt.ylabel('Accuracy')  # Y-akse label
+
+# Trinn 5: Hyperparameter tuning for KNN-modellen
+# Definere hyperparametere for grid search, her antall naboer fra 1 til 30
+knn_params = {'n_neighbors': np.arange(1, 31)}
+# Initialisere GridSearchCV for hyperparameter tuning
+grid_search = GridSearchCV(KNeighborsClassifier(), knn_params, cv=5)
+grid_search.fit(X_train, y_train)  # Trene grid search
+
+# Vise de beste hyperparametrene for KNN
+print("\nBeste hyperparametre for KNN:")
+print(grid_search.best_params_)
+
+# Bruke den beste KNN-modellen for prediksjon
+best_knn_model = grid_search.best_estimator_  # Finne den best trente modellen
+best_knn_predictions = best_knn_model.predict(X_test)  # Predikere på testdataene
+
+# Evaluere den overlegne KNN-modellen
+print("\nKNN med beste hyperparametere Resultater:")
+print("Forvirringsmatrise:")
+print(confusion_matrix(y_test, best_knn_predictions))  # Vise forvirringsmatrise
+print("\nKlassifikasjonsrapport:")
+print(classification_report(y_test, best_knn_predictions))  # Vise klassifikasjonsrapport
+
+# Plotte sammenligning av modeller
+plt.subplot(212)
+plt.boxplot(results['KNN'], labels=['KNN'])
+plt.title('Sammenligning av modeller')  # Tittel til plot
+plt.ylabel('Accuracy')  # Y-akse label
+
+# Vise alle plottene
+plt.tight_layout()  # Justere layout
+plt.show()  # Vise plottene
